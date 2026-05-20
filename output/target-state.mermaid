@@ -1,0 +1,230 @@
+flowchart TD
+
+    %% ── External Actors ──────────────────────────────────────────────
+    CUST(["Direct\nCustomers"])
+    AGG(["Price Comparison\nWebsites"])
+    BRK(["Brokers\nand MGAs"])
+    REIN(["Reinsurers"])
+    LLOYD(["Lloyds Market\nBlueprint Two"])
+    GOVBOARD(["Board / CRO / CFO\nInternal Governance"])
+    REG(["PRA / FCA\nRegulatory Reporting"])
+
+    %% ── Digital Engagement Layer ─────────────────────────────────────
+    subgraph DIGLAYER["Digital Engagement Layer — Cloud-Native — Independent Release Cadence"]
+        CPRT["Customer\nSelf-Service Portal"]
+        QPB["Quote-to-Bind\nEngine"]
+        AADP["Aggregator\nIntegration Adapter"]
+        BPRT["Broker Portal\nand API"]
+    end
+
+    %% ── API Gateway ──────────────────────────────────────────────────
+    subgraph GWLAYER["API Gateway — Single Security Perimeter — OAuth 2.0 / mTLS"]
+        GW["API Gateway\nAWS API GW or Azure APIM\ncloud provider tbc"]
+        BP2["Lloyds Blueprint Two\nCertified Connector"]
+    end
+
+    %% ── Guidewire Cloud Suite ────────────────────────────────────────
+    subgraph GWCORE["Guidewire Cloud Suite — Vendor-Hosted — Insurance System of Record"]
+        PC["PolicyCenter\nPolicy Administration"]
+        CLM["ClaimCenter\nClaims Management"]
+        BIL["BillingCenter\nBilling and Collections"]
+        GDP["Guidewire Data Hub\nCanonical Data Model"]
+    end
+
+    %% ── Integration Layer ────────────────────────────────────────────
+    subgraph INTLAYER["Integration Layer — Durable Audit Trail — Replayable for SS1/21"]
+        EVT["Event Stream\nKafka or EventBridge\nHA — multi-AZ — DLQ required"]
+        ACL["Anti-Corruption Layer\nCOBOL Boundary\nOwner: COBOL team"]
+        MIGCTL["Migration Control Plane\nPolicy routing registry\nAuthority: COBOL or Guidewire per LoB"]
+    end
+
+    %% ── Data Platform ────────────────────────────────────────────────
+    subgraph DATAPLAT["Data Platform — Cloud — Phase 2 — After 2x Solvency II Validation"]
+        DWH["Cloud Data Warehouse\nUK-DPA: UK-only residency\nto confirm at contract"]
+        SOLVRPT["Solvency II\nReporting Engine"]
+        MIRPT["Management MI\nand Analytics"]
+    end
+
+    %% ── Legacy Estate ────────────────────────────────────────────────
+    subgraph LEGESTATE["Legacy Estate — Strangler Fig — Draining by Line of Business — Motor First"]
+        COBOL["COBOL Policy Admin\niSeries / DB2\nin production since 1998"]
+        LCLM["Legacy Claims Package\nunsupported — end-of-life vendor"]
+        SQLRPT["SQL Server ETL\nPhase 1 Solvency II path — maintained as-is"]
+        SHADOW["Claims Analytics SaaS Tool\nShadow IT — active governance incident\nOwner: CISO — resolve before Phase 1 complete"]
+    end
+
+    %% ── Connections: External to Digital Engagement ──────────────────
+    CUST --> CPRT
+    AGG --> AADP
+    BRK --> BPRT
+
+    %% ── Connections: External to API Gateway (direct / machine-to-machine)
+    BRK -- "m2m legacy EDI migration path\ngoverned — not a side door" --> GW
+    REIN --> GW
+    LLOYD <--> BP2
+
+    %% ── Connections: Digital Engagement to API Gateway ───────────────
+    CPRT --> GW
+    QPB --> GW
+    AADP --> GW
+    BPRT --> GW
+    BP2 --> GW
+
+    %% ── Connections: API Gateway to Guidewire Core ───────────────────
+    GW --> PC
+    GW --> CLM
+    GW --> BIL
+
+    %% ── Connections: Guidewire to Integration Layer ──────────────────
+    PC --> EVT
+    CLM --> EVT
+    BIL --> EVT
+    GDP --> EVT
+
+    %% ── Connections: Guidewire to Migration Control Plane ────────────
+    PC --> MIGCTL
+    CLM --> MIGCTL
+
+    %% ── Connections: ACL bidirectional to Legacy ─────────────────────
+    ACL <--> COBOL
+    ACL <--> LCLM
+    ACL --> EVT
+    ACL --> MIGCTL
+
+    %% ── Strangler Fig migration paths ────────────────────────────────
+    COBOL -. "migrating to — line by line\nCRO sign-off per LoB" .-> PC
+    LCLM -. "migrating to — line by line\nCRO sign-off per LoB" .-> CLM
+
+    %% ── Shadow IT ungoverned extract ─────────────────────────────────
+    LCLM -. "data extract — ungoverned\ngovernance gate: CISO" .-> SHADOW
+
+    %% ── Connections: Integration to Data Platform ────────────────────
+    EVT --> DWH
+    DWH --> SOLVRPT
+    DWH --> MIRPT
+
+    %% ── Data Platform to Board / CRO / CFO to Regulator ─────────────
+    SOLVRPT --> GOVBOARD
+    MIRPT --> GOVBOARD
+    GOVBOARD --> REG
+
+    %% ── Phase 1 legacy Solvency II path ──────────────────────────────
+    COBOL --> SQLRPT
+    SQLRPT -. "Phase 1 only — decommission\nafter 2x Solvency II CRO sign-off" .-> REG
+
+    %% ── Styles ───────────────────────────────────────────────────────
+    classDef legacyStyle fill:#fff3cd,stroke:#856404,stroke-width:2px,color:#212529
+    classDef shadowStyle fill:#ffd6d6,stroke:#842029,stroke-width:2px,color:#212529
+    classDef cloudNative fill:#d1e7dd,stroke:#0f5132,stroke-width:2px,color:#212529
+    classDef guidewireStyle fill:#cfe2ff,stroke:#084298,stroke-width:2px,color:#212529
+    classDef gatewayStyle fill:#f8d7da,stroke:#842029,stroke-width:2px,color:#212529
+    classDef dataPlatStyle fill:#e2d9f3,stroke:#432874,stroke-width:2px,color:#212529
+    classDef externalStyle fill:#f8f9fa,stroke:#6c757d,stroke-width:1px,color:#212529
+    classDef govStyle fill:#fff0d6,stroke:#664d03,stroke-width:2px,color:#212529
+
+    class COBOL,LCLM,SQLRPT legacyStyle
+    class SHADOW shadowStyle
+    class CPRT,QPB,AADP,BPRT,EVT,ACL,MIGCTL cloudNative
+    class PC,CLM,BIL,GDP guidewireStyle
+    class GW,BP2 gatewayStyle
+    class DWH,SOLVRPT,MIRPT dataPlatStyle
+    class CUST,AGG,BRK,REIN,LLOYD,REG externalStyle
+    class GOVBOARD govStyle
+
+
+%% ════════════════════════════════════════════════════════════════════
+%% DESIGN RATIONALE
+%% ════════════════════════════════════════════════════════════════════
+%%
+%% 1. API GATEWAY AS SOLE EXTERNAL SECURITY PERIMETER
+%%    Every external actor — customers, aggregators, brokers, reinsurers,
+%%    Lloyd's — enters through the API Gateway. No actor reaches Guidewire
+%%    or the integration layer directly. This gives Atlas, for the first
+%%    time, a single point to enforce OAuth 2.0 / mTLS, rate limiting,
+%%    audit logging, and API versioning across all ~120 integrations.
+%%    The broker dual-path (portal + m2m) is explicitly labelled as a
+%%    governed migration path for legacy EDI; it is not a security exemption.
+%%    Cloud provider (AWS vs Azure) is tbc — the gateway design is
+%%    provider-agnostic.
+%%
+%% 2. DIGITAL ENGAGEMENT LAYER SEPARATED FROM GUIDEWIRE
+%%    Customer portal, quote-to-bind engine, aggregator adapter, and broker
+%%    portal are cloud-native microservices with their own CI/CD pipeline,
+%%    independent of Guidewire's quarterly release cadence. This is the
+%%    mechanism for closing the 40%-below-median aggregator conversion gap.
+%%    These services are the FCA Consumer Duty exposure surface; a named
+%%    FCA conduct owner must be confirmed before this layer enters delivery.
+%%
+%% 3. GUIDEWIRE CLOUD SUITE AS VENDOR-HOSTED SYSTEM OF RECORD
+%%    Guidewire's unified PolicyCenter/ClaimCenter data model structurally
+%%    resolves the claims-to-policy reconciliation gap that triggered PRA
+%%    enhanced supervision. Guidewire carries infrastructure resilience
+%%    obligations, but Atlas retains accountability: Guidewire SLAs must be
+%%    mapped to SS1/21 impact tolerances at contract. DORA Article 28
+%%    requires audit rights, exit provisions, and sub-contracting visibility
+%%    as contract conditions, not post-implementation governance.
+%%
+%% 4. EVENT STREAM AS INTEGRATION BACKBONE — EXPLICIT RESILIENCE REQUIRED
+%%    Durable, replayable event log is material SS1/21 evidence. Decouples
+%%    data platform delivery from Guidewire timeline. Provides ACL
+%%    integration point without hard COBOL-to-Guidewire dependency.
+%%    MUST be multi-AZ with dead-letter queue — the SS1/21 replayability
+%%    claim is void if the stream itself is a single point of failure.
+%%    Trade-off accepted: eventual consistency between Guidewire write
+%%    model and downstream consumers (appropriate for Solvency II quarterly
+%%    cycle; not appropriate for real-time transactional consistency).
+%%
+%% 5. ANTI-CORRUPTION LAYER — COBOL TEAM OWNERSHIP IS AN ARCHITECTURAL CONTROL
+%%    The COBOL system's field meanings, status code semantics, and
+%%    product-line conventions are not documented — they exist only in
+%%    the heads of long-tenured developers. An implementation team working
+%%    from DB2 schema alone produces a translation that is syntactically
+%%    correct and semantically wrong. Wrong ACL mappings corrupt the
+%%    canonical event model, the data platform, and Solvency II reporting.
+%%    COBOL team ownership is a risk control, not a workforce courtesy.
+%%    The ACL also queries the Migration Control Plane to route requests
+%%    to the correct authoritative system during migration.
+%%
+%% 6. MIGRATION CONTROL PLANE — MAKING THE STRANGLER FIG GOVERNABLE
+%%    A policy routing registry records, per line of business, whether
+%%    COBOL or Guidewire is currently authoritative. The ACL queries it
+%%    for every request during migration. Guidewire writes to it as each
+%%    LoB migration is CRO-signed-off. Without this, mid-migration state
+%%    has no governance mechanism: a motor policy still in COBOL could be
+%%    silently routed to Guidewire and return not-found. Also provides the
+%%    PRA audit trail for the migration itself.
+%%
+%% 7. INTERNAL GOVERNANCE BEFORE REGULATORY REPORTING
+%%    Solvency II reporting and MI route through Board/CRO/CFO before
+%%    reaching PRA/FCA. This reflects how regulated firms under enhanced
+%%    PRA supervision actually operate. Helen Whitaker holds board-level
+%%    veto on solvency reporting; the diagram shows the human review gate
+%%    explicitly rather than implying a direct system-to-regulator flow.
+%%
+%% 8. SHADOW IT CLAIMS ANALYTICS TOOL — SHOWN AS GOVERNANCE INCIDENT
+%%    Morag Sinclair's SaaS analytics tool is a current active data flow
+%%    on the same claims data the ACL governs. Omitting it would make the
+%%    diagram factually wrong. Resolution: either decommission (if absorbed
+%%    by the MI service) or bring under governance via the integration layer.
+%%    CISO owns the resolution gate. Must be resolved before Phase 1 complete.
+%%
+%% 9. GDPR / UK-DPA DATA RESIDENCY
+%%    Customer PII and policyholder data flow through the API gateway into
+%%    Guidewire and the cloud data warehouse. UK-DPA requires UK-only
+%%    residency or equivalent safeguards for any cross-border transfer.
+%%    UK residency must be confirmed at contract for: Guidewire hosted
+%%    environment (which AWS/Azure region), cloud data platform, and
+%%    digital engagement layer deployment region. Contracting obligation,
+%%    not a design assumption.
+%%
+%% 10. TWO PARALLEL SOLVENCY II PATHS — PHASE 1 / PHASE 2 BOUNDARY EXPLICIT
+%%     SQL Server ETL is maintained unchanged through Phase 1. Data platform
+%%     Solvency II engine is Phase 2 only. Migrating the core system AND
+%%     replacing the Solvency II reporting path simultaneously creates two
+%%     independent change risks on the same critical regulatory output.
+%%     Decommission trigger for the SQL Server ETL is the CRO sign-off gate
+%%     after 2x consecutive validated Solvency II returns from Guidewire data
+%%     — not a calendar date. The programme must not decommission early to
+%%     save cost before the CRO has verified the replacement.
+%%
+%% ════════════════════════════════════════════════════════════════════
